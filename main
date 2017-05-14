@@ -1,0 +1,99 @@
+import operator
+import time
+
+start_time = time.time()
+
+class Combinator(list):
+
+    class individual:
+        def __init__(self, item):
+            self.sign = None
+            self.equation = []
+            self.order = self.solve = item
+
+        def __str__(self):
+            return str(self.solve)
+
+    class combination:
+
+        def __init__(self, sign, first, second, *other):
+            self.sign = sign
+            self.equation = [first] + [second] + [*other]
+            self.order = first.order
+
+            if (self.sign == '-' and self.equation[1].solve == 0) or (self.sign == '/' and self.equation[1].solve in [0, 1]):
+                self.solve = float('nan')
+                
+            else:
+                self.solve = self.equation[0].solve
+                for item in self.equation[1:]:
+                    self.solve = {
+                        '+':operator.add, '*':operator.mul, '-':operator.sub, '/':operator.truediv
+                    }[self.sign](self.solve, item.solve)
+
+        def __str__(self):
+            
+            #swap a subtraction to multiply the entire result by -1
+            global negative
+            if negative == -1 and self.sign == '-':  
+                self.equation = list(reversed(self.equation))
+                negative = 1
+                
+            return '({})'.format(' {} '.format(self.sign).join([str(i) for i in self.equation]))
+    
+    def canCombine(self, sign, first, second):
+        
+        equation = self[first].equation + [self[second]] if self[first].sign == sign else [self[first], self[second]]
+        
+        if sign in {'-', '/'} and len(equation) > 2:
+            return False
+
+        for i in equation:
+
+            if i.sign == sign:
+                return False
+
+            if i.sign == {'+':'-', '*':'/', '-':'+', '/':'*'}[sign]:
+                if sign in {'+', '*'} or True in {j.sign == sign for j in i.equation}:
+                    return False
+
+        if sign != '/' and equation[-1].order < equation[-2].order:
+            return False
+
+        yield Combinator.combination(sign, *equation)
+    
+    def __call__(self, target):        
+        
+        length = len(self)
+        if length == 1:
+            global negative
+            negative = 1       
+            for k in {1, -1}:
+                if self[0].solve == target * k:
+                    negative = k
+                    yield ' '.join([str(self[0])[1:-1], '=', str(target)])
+                    return
+        
+        if (time.time() - start_time) > timer:
+            return
+
+        for first in range(length):
+            for second in {i for i in range(length)} - {first}:
+                for sign in {True: {'+','-','*','/'}, False: {'/'}}[first <= second]:
+                    for combination in self.canCombine(sign, first, second):     #will only return 1 or 0 results
+                        for i in Combinator([combination if i == first else self[i] for i in range(length) \
+                                            if i != second])(target):                #recursion
+                                yield i
+
+input = [2, 4, 6, 8]
+target = 24           
+timer = 60
+
+hits = False
+for i in set(Combinator([Combinator.individual(i) for i in input])(target)):
+    hits = True
+    print(i)
+
+if not hits:
+    print('No matches')
+print("--- %s seconds ---" %(time.time() - start_time))
